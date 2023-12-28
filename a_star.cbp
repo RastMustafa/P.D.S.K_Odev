@@ -1,0 +1,187 @@
+#include <iostream>
+#include <unordered_map>
+#include <vector>
+#include <queue>
+#include <cmath>
+#include <climits>
+#include <algorithm>
+using namespace std;
+
+
+/*
+       1- Türk şehirlerinin enlem ve boylamı alındı
+       2- Bir harita kullanılarak yol çiftleri oluşturuldu
+       3- Enlem ve boylam kullanılarak şehirler arası yaklaşık mesafe hesaplandı
+       4- A* fonksiyonunu uygulayın
+        Not: Bazı başlangıç ve bitiş noktalarının bağlantılı olmamasının nedeni, internet üzerinde ihtiyaç duyulan otoyolun şehirler arasında mevcut olup olmadığına dair herhangi bir bilgi bulunmamasıdır,
+        Belirtilen adımı uygulayarak ana yolları kendim oluşturdum.
+*/
+
+const unordered_map<int, string> cities = {
+    {1, "Adana"}, {2, "Adıyaman"}, {3, "Afyonkarahisar"}, {6, "Ankara"}, {7, "Antalya"},
+    {10, "Aydın"}, {12, "Balıkesir"}, {14, "Batman"}, {19, "Bolu"}, {21, "Bursa"},
+    {22, "Denizli"}, {23, "Diyarbakır"}, {24, "Düzce"}, {26, "Elazığ"}, {27, "Erzincan"},
+    {28, "Erzurum"}, {29, "Eskişehir"}, {30, "Gaziantep"}, {31, "Giresun"}, {35, "Isparta"},
+    {38, "Kahramanmaraş"}, {39, "Karabük"}, {40, "Karaman"}, {41, "Kars"}, {43, "Kayseri"},
+    {45, "Kocaeli"}, {46, "Konya"}, {47, "Kütahya"}, {49, "Kırıkkale"}, {51, "Malatya"},
+    {52, "Manisa"}, {53, "Mardin"}, {54, "Mersin"}, {60, "Osmaniye"}, {62, "Sakarya"},
+    {63, "Samsun"}, {66, "Sivas"}, {68, "Tokat"}, {69, "Trabzon"}, {71, "Uşak"},
+    {72, "Van"}, {75, "Zonguldak"}, {80, "İzmir"}, {81, "Şanlıurfa"},
+    {34, "İstanbul"}, {17, "Çanakkale"}, {20, "Edirne"}, {33, "İzmit"}, {16, "Bursa"},
+};
+const vector<tuple<int, int, double>> roads = {
+    {21, 12, 116.8021028684977},
+    {52, 80, 33.92698686544373},
+    {80, 10, 88.59581360352342},
+    {10, 22, 109.1366190062639},
+    {22, 35, 129.51385984787},
+    {22, 7, 173.7321833734445},
+    {80, 71, 198.9721283136021},
+    {71, 3, 98.81930178146023},
+    {21, 47, 116.7173540763063},
+    {47, 29, 61.00623014566349},
+    {71, 47, 96.18434732763565},
+    {47, 29, 61.00623014566349},
+    {45, 62, 40.69631747470578},
+    {62, 24, 64.1465540371853},
+    {24, 19, 39.64513022609112},
+    {19, 39, 99.89655729884905},
+    {6, 29, 199.5681914805313},
+    {39, 75, 74.83063650601099},
+    {6, 29, 199.5681914805313},
+    {6, 3, 237.6770720138253},
+    {6, 24, 175.5134409877237},
+    {6, 49, 57.49016912409408},
+    {49, 39, 168.4988484574211},
+    {49, 43, 210.5666604419154},
+    {43, 66, 174.3492307759479},
+    {66, 68, 74.04186915572711},
+    {68, 63, 110.1471186199016},
+    {46, 40, 99.9862482537383},
+    {40, 54, 132.6689657013569},
+    {54, 1, 65.09417989067542},
+    {1, 60, 82.85234411918036},
+    {60, 38, 82.73217753319139},
+    {38, 30, 70.03116890168036},
+    {30, 81, 125.7016768650579},
+    {38, 2, 120.0222440445771},
+    {2, 51, 65.11770800274904},
+    {51, 26, 86.54940697390487},
+    {26, 23, 122.9021626398934},
+    {23, 81, 152.6250830762371},
+    {81, 53, 172.8928786129811},
+    {53, 14, 72.77065437135913},
+    {23, 14, 78.30917439789964},
+    {26, 72, 361.8687295250689},
+    {66, 27, 211.5648284384143},
+    {27, 28, 153.5334340028008},
+    {28, 41, 172.8177245426286},
+    {63, 31, 177.2236885325177},
+    {31, 69, 112.3837213203393},
+
+};
+
+
+
+struct Node {
+    int id;
+    double g;
+    double h;
+    double f;
+
+    Node(int _id, double _g, double _h) : id(_id), g(_g), h(_h), f(_g + _h) {}
+
+    // Define comparison for priority_queue
+    bool operator>(const Node& other) const {
+        return f > other.f;
+    }
+};
+
+double heuristic(int cityId, int goalId) {
+    return abs(cityId - goalId);
+}
+
+vector<int> aStar(int start, int goal, const vector<tuple<int, int, double>>& graph) {
+    priority_queue<Node, vector<Node>, greater<>> pq;
+    unordered_map<int, double> gValues;
+    unordered_map<int, int> cameFrom;
+
+    pq.push(Node(start, 0.0, heuristic(start, goal)));
+    gValues[start] = 0.0;
+
+    while (!pq.empty()) {
+        Node current = pq.top();
+        pq.pop();
+
+        if (current.id == goal) {
+            // Reconstruct the path
+            vector<int> path;
+            int currentId = goal;
+            while (currentId != start) {
+                path.push_back(currentId);
+                currentId = cameFrom[currentId];
+            }
+            path.push_back(start);
+            reverse(path.begin(), path.end());
+            return path;
+        }
+
+        for (const auto& edge : graph) {
+            int fromCity = get<0>(edge);
+            int toCity = get<1>(edge);
+            double distance = get<2>(edge);
+
+            if (current.id == fromCity) {
+                int neighborId = toCity;
+                double newG = gValues[current.id] + distance;
+
+                if (!gValues.count(neighborId) || newG < gValues[neighborId]) {
+                    gValues[neighborId] = newG;
+                    cameFrom[neighborId] = current.id;
+                    pq.push(Node(neighborId, newG, heuristic(neighborId, goal)));
+                }
+            }
+        }
+    }
+
+    return {};
+}
+
+void printShortestPath(int start, int goal) {
+    vector<int> shortestPath = aStar(start, goal, roads);
+
+    cout << "Shortest Path from " << cities.at(start) << " to " << cities.at(goal) << ":\n";
+    if (!shortestPath.empty()) {
+        double totalDistance = 0.0;
+        for (size_t i = 0; i < shortestPath.size() - 1; ++i) {
+            int currentCity = shortestPath[i];
+            int nextCity = shortestPath[i + 1];
+            double distance = 0.0;
+
+            for (const auto& edge : roads) {
+                int fromCity = get<0>(edge);
+                int toCity = get<1>(edge);
+                if ((currentCity == fromCity && nextCity == toCity) ||
+                    (currentCity == toCity && nextCity == fromCity)) {
+                    distance = get<2>(edge);
+                    break;
+                }
+            }
+
+            totalDistance += distance;
+            cout << cities.at(currentCity) << " -> ";
+        }
+        cout << cities.at(shortestPath.back()) << "\n";
+        cout << "Total Distance: " << totalDistance << " km\n";
+    } else {
+        cout << "No path found.\n";
+    }
+}
+
+int main() {
+    int startCity = 52;
+    int goalCity = 35;
+    printShortestPath(startCity, goalCity);
+
+    return 0;
+}
